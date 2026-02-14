@@ -95,3 +95,34 @@ CC=jellocc ./configure && make -j4
 - **Autoconf compatibility:** `./configure` runs dozens of compiler probes — feature tests, flag checks, `conftest.c` compilations, `-Werror` trials. All of them passed through jello transparently. The configure script had no idea it wasn't talking to the real compiler.
 - **Libtool orchestration:** libtool wraps `CC` with its own flags (`-fPIC`, `-DPIC`, version info, install names) and calls it for both compilation and linking. jello handled all of libtool's invocation patterns without interference.
 - **Multi-library builds:** 8 internal convenience libraries for different CPU instruction sets (SSE2, SSE4.1, AVX2, AVX-512, AES-NI, ARM Crypto, SSSE3, RDRAND) all compiled and linked independently before being merged into the final `libsodium`. jello handled the full DAG.
+
+---
+
+## 4. zstd (Zstandard)
+
+**Repo:** https://github.com/facebook/zstd
+**Result:** PASS
+**Date:** 2026-02-14
+
+### Why This Project
+
+zstd is Facebook's production compression library with a complex multi-target Makefile. A single `make` invocation builds three separate configurations: the core library as both static (`libzstd.a`) and shared (`libzstd.dylib`), then the CLI tool which statically links all internal components plus external dependencies. The Makefile compiles the same source files multiple times with different flags for each configuration (static vs dynamic vs program), testing jello's ability to handle a multi-pass build with distinct compilation contexts.
+
+### Build Command
+
+```
+make CC=jellocc HAVE_ZLIB=0 HAVE_LZMA=0 HAVE_LZ4=0 -j4
+```
+
+### Output Summary
+
+- 101 C source files compiled via passthrough across 3 build configurations (static lib, shared lib, CLI)
+- 3 artifacts produced: `libzstd.a` (2.0 MB static), `libzstd.1.6.0.dylib` (1.8 MB shared), `zstd` (2.0 MB CLI binary)
+- Final CLI binary linked with threading support (`-pthread`) and 41 object files in a single link invocation
+- Zero errors, zero warnings
+
+### What Jello Provided
+
+- **Multi-configuration builds:** The same source files were compiled three times with different flags (`-fPIC` for shared, without for static, with program-specific defines for CLI). jello passed through all three configurations without interference.
+- **Complex link invocation:** The final `zstd` binary link command included 41 object files, `-pthread`, `-arch arm64`, and dozens of warning flags — all passed through verbatim to the real compiler driver.
+- **Build system flag soup:** zstd's Makefile passes aggressive warning flags (`-Wcast-qual`, `-Wstrict-aliasing=1`, `-Wc++-compat`), architecture flags, and GNU-style assembler options (`-Wa,--noexecstack`). jello handled all of them transparently.
