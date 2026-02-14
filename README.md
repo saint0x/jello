@@ -2,9 +2,14 @@
 
 > The compiler IR for linkers.
 
-**jello** is a deterministic linker driver that turns messy, folklore-heavy linking into a clean, explainable **LinkPlan**. It sits where `cc`/`c++`/`ld` sit, normalizes the invocation, resolves the environment, produces a deterministic plan, and runs the best backend linker.
+**jello** is a deterministic linker driver that turns messy, folklore-heavy linking into a clean, explainable **LinkPlan**. It normalizes linker invocations, resolves the environment, produces a deterministic plan, and runs the best backend linker.
 
 It does **not** replace your linker. It makes linking **understandable and reliable**.
+
+jello ships as three binaries:
+
+* **`jellocc` / `jelloc++`** — transparent compiler wrappers. Drop in as `CC=jellocc` and they passthrough all invocations to the real compiler. Your build system doesn't know they're there.
+* **`jellod`** — the intelligent linker driver. This is where the LinkPlan pipeline lives: normalization, resolution, reordering, diagnostics, and backend selection.
 
 ---
 
@@ -23,7 +28,7 @@ jello makes linking **deterministic and explainable** by introducing a first-cla
 
 ## What jello does
 
-* Acts as a drop-in driver: `CC=jellocc CXX=jelloc++`
+* Acts as a transparent drop-in: `CC=jellocc CXX=jelloc++` — handles compile, link, preprocess, and introspection seamlessly
 * Normalizes chaotic linker invocations into a structured model
 * Resolves target, sysroot, search paths, and libraries
 * Computes a deterministic **LinkPlan**
@@ -110,6 +115,22 @@ Config hierarchy (highest priority wins):
 4. Defaults
 
 All fields are optional. Missing fields fall through to the next layer. Run `jello doctor` to see active config and detected environment.
+
+---
+
+## Validated
+
+jello has been tested as a drop-in `CC=jellocc` across 5 real-world C projects covering Makefile, autotools, and CMake build systems:
+
+| Project | Files | Artifacts | Build System |
+|---------|-------|-----------|-------------|
+| [mbedtls](https://github.com/Mbed-TLS/mbedtls) | 113 | 3 static libs | Makefile |
+| [lz4](https://github.com/lz4/lz4) | 22 | static + shared + CLI | Makefile |
+| [libsodium](https://github.com/jedisct1/libsodium) | 146 | 9 link targets, static + shared | autotools + libtool |
+| [zstd](https://github.com/facebook/zstd) | 101 | static + shared + CLI | Makefile |
+| [mimalloc](https://github.com/microsoft/mimalloc) | 39 | static + shared + 4 test binaries | CMake |
+
+All builds produce identical outputs to native `CC=cc`. See [RESULTS.md](RESULTS.md) for details.
 
 ---
 
