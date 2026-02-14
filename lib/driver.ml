@@ -107,9 +107,11 @@ let collect_archive_paths (inv : invocation) resolved_libs =
   in
   from_inputs @ from_resolved
 
-(* Compile passthrough: find the real compiler, exec with all args verbatim.
+(* Full passthrough: find the real compiler, exec with all args verbatim.
+   Used for jellocc/jelloc++ wrapper mode — all invocations (compile, link,
+   preprocess, introspection) go straight to the real compiler driver.
    Returns the process exit code directly — no plan, no diagnostics. *)
-let compile lang config args =
+let passthrough lang config args =
   let compiler_result = Discover.real_compiler lang in
   match compiler_result with
   | Error e ->
@@ -118,7 +120,7 @@ let compile lang config args =
       1
   | Ok compiler_path ->
       Log.info (fun m ->
-          m "Compile passthrough: %s %s" compiler_path
+          m "Passthrough: %s %s" compiler_path
             (String.concat " " args));
       let cmd =
         List.fold_left
@@ -133,7 +135,7 @@ let compile lang config args =
           code
       | Error (`Msg msg) ->
           if not config.silent then
-            Printf.eprintf "jello: compile passthrough failed: %s\n" msg;
+            Printf.eprintf "jello: passthrough failed: %s\n" msg;
           1)
 
 (* The full pipeline *)

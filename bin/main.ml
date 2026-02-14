@@ -303,31 +303,23 @@ let run_wrapper_mode mode =
   let args = Array.to_list Sys.argv |> List.tl in
   let cfg = load_config () in
   let driver_cfg = config_to_driver cfg in
-  (* Set up logging based on config *)
   if not cfg.silent then
     setup_logging None (Config.to_logs_level cfg.log_level);
   match mode with
   | `Ld ->
-      (* Always linker pipeline *)
+      (* Raw linker replacement — jello's full pipeline *)
       (match Driver.link driver_cfg args with
       | Ok result -> exit result.Types.exit_code
       | Error e ->
           if not cfg.silent then
             Printf.eprintf "jello: %s\n" (Types.error_to_string e);
           exit 1)
-  | `Cc | `Cxx ->
-      if Parse.is_compile_only args then
-        (* Compile passthrough — no linker pipeline *)
-        let lang = match mode with `Cc -> `C | `Cxx -> `Cxx | `Ld -> `C in
-        exit (Driver.compile lang driver_cfg args)
-      else
-        (* No -c/-S/-E: this is a link invocation through the compiler driver *)
-        (match Driver.link driver_cfg args with
-        | Ok result -> exit result.Types.exit_code
-        | Error e ->
-            if not cfg.silent then
-              Printf.eprintf "jello: %s\n" (Types.error_to_string e);
-            exit 1)
+  | `Cc ->
+      (* Compiler wrapper — all invocations passthrough to real cc *)
+      exit (Driver.passthrough `C driver_cfg args)
+  | `Cxx ->
+      (* Compiler wrapper — all invocations passthrough to real c++ *)
+      exit (Driver.passthrough `Cxx driver_cfg args)
 
 (* --- Main --- *)
 
