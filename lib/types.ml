@@ -63,7 +63,26 @@ let os_to_string = function
   | Windows -> "windows"
   | Bare -> "none"
 
-let os_of_string = function
+let os_of_string s =
+  (* Strip version suffixes: darwin24.3.0 -> darwin *)
+  let base =
+    match String.index_opt s '.' with
+    | Some i ->
+        let prefix = String.sub s 0 i in
+        (* Strip trailing digits: darwin24 -> darwin *)
+        let len = ref (String.length prefix) in
+        while !len > 0 && prefix.[!len - 1] >= '0' && prefix.[!len - 1] <= '9' do
+          decr len
+        done;
+        if !len > 0 then String.sub prefix 0 !len else prefix
+    | None ->
+        let len = ref (String.length s) in
+        while !len > 0 && s.[!len - 1] >= '0' && s.[!len - 1] <= '9' do
+          decr len
+        done;
+        if !len > 0 && !len < String.length s then String.sub s 0 !len else s
+  in
+  match base with
   | "linux" -> Some Linux
   | "darwin" -> Some Darwin
   | "freebsd" -> Some FreeBSD
@@ -397,7 +416,7 @@ type error =
   | Exec_error of { exit_code : int; stderr : string }
   | Multiple of error list
 
-let error_to_string = function
+let rec error_to_string = function
   | Parse_error s -> Printf.sprintf "parse error: %s" s
   | Normalize_error s -> Printf.sprintf "normalization error: %s" s
   | Discovery_error s -> Printf.sprintf "discovery error: %s" s

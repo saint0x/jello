@@ -15,26 +15,34 @@ let file_exists path =
   | Ok true -> true
   | _ -> false
 
+(* Check if s contains sub anywhere *)
+let string_contains s sub =
+  let sl = String.length s and bl = String.length sub in
+  if bl > sl then false
+  else
+    let rec check i =
+      if i > sl - bl then false
+      else if String.sub s i bl = sub then true
+      else check (i + 1)
+    in
+    check 0
+
 (* Detect architecture from a file using the `file` command *)
 let detect_arch path =
-  let open Bos in
-  match OS.Cmd.(run_out (Cmd.v "file" % path) |> to_string) with
+  let cmd = Bos.Cmd.(v "file" % path) in
+  match Bos.OS.Cmd.(run_out cmd |> to_string) with
   | Ok output ->
       let lower = String.lowercase_ascii output in
-      if String.is_suffix ~affix:"x86-64" lower
-         || String.is_suffix ~affix:"x86_64" lower then
+      if string_contains lower "x86-64"
+         || string_contains lower "x86_64" then
         Some X86_64
-      else if String.is_suffix ~affix:"aarch64" lower
-              || String.is_suffix ~affix:"arm64" lower then
+      else if string_contains lower "aarch64"
+              || string_contains lower "arm64" then
         Some Aarch64
-      else if String.is_suffix ~affix:"80386" lower then Some I686
-      else if String.is_suffix ~affix:"arm" lower then Some Armv7
+      else if string_contains lower "80386" then Some I686
+      else if string_contains lower "arm" then Some Armv7
       else None
   | Error _ -> None
-
-and is_suffix ~affix s =
-  let al = String.length affix and sl = String.length s in
-  sl >= al && String.sub s (sl - al) al = affix
 
 (* Search for a library file in a list of directories *)
 let find_lib name search_paths ~prefer_static =
@@ -110,7 +118,7 @@ let resolve_one search_paths ~prefer_static ref =
           Error (Resolve_error { lib = name; searched = fw_paths }))
 
 (* Determine static preference from flags *)
-let is_static_preferred flags =
+let is_static_preferred (flags : flag list) =
   (* Walk flags in order, track current static/dynamic state *)
   let rec walk static = function
     | [] -> static
@@ -122,10 +130,10 @@ let is_static_preferred flags =
   walk false flags
 
 (* Extract all library references from flags and inputs *)
-let collect_lib_refs inv =
+let collect_lib_refs (inv : invocation) =
   let from_flags =
     List.filter_map
-      (fun f -> match f with Link_lib r -> Some r | _ -> None)
+      (fun (f : flag) -> match f with Link_lib r -> Some r | _ -> None)
       inv.flags
   in
   let from_inputs =
@@ -136,13 +144,13 @@ let collect_lib_refs inv =
   from_flags @ from_inputs
 
 (* Build the full search path list *)
-let build_search_paths inv =
+let build_search_paths (inv : invocation) =
   let explicit = inv.search_paths in
   let system = Discover.search_paths () in
   explicit @ system
 
 (* Main entry point: resolve all libraries in an invocation *)
-let libs inv =
+let libs (inv : invocation) =
   let search_paths = build_search_paths inv in
   let prefer_static = is_static_preferred inv.flags in
   let refs = collect_lib_refs inv in

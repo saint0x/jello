@@ -10,7 +10,7 @@ module Log = (val Logs.src_log src : Logs.LOG)
 
 (* A pattern rule: regex, diagnostic builder *)
 type rule = {
-  code : string;
+  code : string; [@warning "-69"]
   re : Re.re;
   build : Re.Group.t -> string -> diagnostic;
 }
@@ -592,7 +592,7 @@ let match_line line =
 let dedup diags =
   let seen = Hashtbl.create 16 in
   List.filter
-    (fun d ->
+    (fun (d : diagnostic) ->
       let key = d.code ^ ":" ^ String.concat "," d.evidence in
       if Hashtbl.mem seen key then false
       else (

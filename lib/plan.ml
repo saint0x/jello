@@ -93,8 +93,8 @@ let build_backend_args plan =
   List.rev !args
 
 (* Build a LinkPlan from all resolved components *)
-let build ~inv ~triple ~backend ~backend_path ~resolved_libs ~search_paths
-    ~fixes =
+let build ~(inv : invocation) ~triple ~backend ~backend_path ~resolved_libs
+    ~search_paths ~fixes =
   let sysroot =
     List.find_map
       (fun f -> match f with Sysroot v -> Some v | _ -> None)

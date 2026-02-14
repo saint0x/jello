@@ -7,6 +7,8 @@ let src = Logs.Src.create "jello.driver" ~doc:"Driver pipeline"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
+let ( let* ) = Result.bind
+
 type config = {
   fix_mode : fix_mode;
   emit_plan : bool;
@@ -19,7 +21,7 @@ let default_config =
   {
     fix_mode = Auto_fix;
     emit_plan = true;
-    plan_dir = ".gel";
+    plan_dir = ".jello";
     dry_run = false;
     explain = false;
   }
@@ -33,7 +35,7 @@ let print_diagnostic d =
     | Sev_info -> "info"
     | Sev_hint -> "hint"
   in
-  Printf.eprintf "[gel:%s] %s: %s\n" d.code prefix d.message;
+  Printf.eprintf "[jello:%s] %s: %s\n" d.code prefix d.message;
   List.iter
     (fun f ->
       let conf =
@@ -47,7 +49,7 @@ let print_diagnostic d =
 
 (* Print the explain trace *)
 let print_explain plan =
-  Printf.eprintf "\n--- gel explain ---\n";
+  Printf.eprintf "\n--- jello explain ---\n";
   Printf.eprintf "Triple:     %s\n" (triple_to_string plan.triple);
   Printf.eprintf "Backend:    %s (%s)\n"
     (backend_to_string plan.backend)
@@ -80,7 +82,7 @@ let print_explain plan =
   Printf.eprintf "--- end explain ---\n\n"
 
 (* Collect static archive paths for reordering *)
-let collect_archive_paths inv resolved_libs =
+let collect_archive_paths (inv : invocation) resolved_libs =
   let from_inputs =
     List.filter_map
       (fun i -> match i with Archive p -> Some p | _ -> None)
@@ -88,14 +90,14 @@ let collect_archive_paths inv resolved_libs =
   in
   let from_resolved =
     List.filter_map
-      (fun r -> match r.kind with Static_lib -> Some r.path | _ -> None)
+      (fun (r : lib_resolved) -> match r.kind with Static_lib -> Some r.path | _ -> None)
       resolved_libs
   in
   from_inputs @ from_resolved
 
 (* The full pipeline *)
 let link config args =
-  Log.info (fun m -> m "Starting gel link pipeline");
+  Log.info (fun m -> m "Starting jello link pipeline");
   (* Phase 1: Parse *)
   let* inv = Parse.args args in
   Log.debug (fun m ->

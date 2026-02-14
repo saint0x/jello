@@ -1,5 +1,5 @@
-(* main.ml — CLI entry point for gel.
-   Supports direct invocation and wrapper mode (gelcc, gelc++, geld). *)
+(* main.ml — CLI entry point for jello.
+   Supports direct invocation and wrapper mode (jellocc, jelloc++, jellod). *)
 
 open Jello
 
@@ -12,9 +12,9 @@ let setup_logging style_renderer level =
 let detect_mode () =
   let prog = Filename.basename Sys.argv.(0) in
   match prog with
-  | "gelcc" -> `Cc
-  | "gelc++" -> `Cxx
-  | "geld" -> `Ld
+  | "jellocc" -> `Cc
+  | "jelloc++" -> `Cxx
+  | "jellod" -> `Ld
   | _ -> `Direct
 
 (* --- Link subcommand --- *)
@@ -35,7 +35,7 @@ let link_cmd =
   let plan_dir =
     Arg.(
       value
-      & opt string ".gel"
+      & opt string ".jello"
       & info [ "plan-dir" ] ~docv:"DIR"
           ~doc:"Directory for plan artifacts.")
   in
@@ -70,19 +70,19 @@ let link_cmd =
       }
     in
     match Driver.link config args with
-    | Ok result -> `Ok result.Types.exit_code
+    | Ok result ->
+        if result.Types.exit_code <> 0 then
+          exit result.Types.exit_code
     | Error e ->
-        Printf.eprintf "gel: %s\n" (Types.error_to_string e);
-        `Ok 1
+        Printf.eprintf "jello: %s\n" (Types.error_to_string e);
+        exit 1
   in
   let term =
     Term.(
-      ret
-        (const (fun dr ex np pd md ar sr lv ->
-             `Ok (link_action dr ex np pd md ar sr lv))
-        $ dry_run $ explain $ no_plan $ plan_dir $ mode $ args
-        $ Fmt_cli.style_renderer ()
-        $ Logs_cli.level ()))
+      const link_action
+      $ dry_run $ explain $ no_plan $ plan_dir $ mode $ args
+      $ Fmt_cli.style_renderer ()
+      $ Logs_cli.level ())
   in
   Cmd.v info term
 
@@ -94,8 +94,8 @@ let doctor_cmd =
   let info = Cmd.info "doctor" ~doc in
   let doctor_action _style_renderer _level =
     setup_logging _style_renderer _level;
-    Printf.printf "gel doctor\n";
-    Printf.printf "=========\n\n";
+    Printf.printf "jello doctor\n";
+    Printf.printf "============\n\n";
     (* Compiler *)
     (match Discover.compiler `C with
     | Ok cc -> Printf.printf "C compiler:   %s\n" cc
@@ -142,15 +142,13 @@ let doctor_cmd =
     Printf.printf "\nDefault search paths:\n";
     List.iter
       (fun p -> Printf.printf "  %s\n" p)
-      (Discover.search_paths ());
-    `Ok 0
+      (Discover.search_paths ())
   in
   let term =
     Term.(
-      ret
-        (const doctor_action
-        $ Fmt_cli.style_renderer ()
-        $ Logs_cli.level ()))
+      const doctor_action
+      $ Fmt_cli.style_renderer ()
+      $ Logs_cli.level ())
   in
   Cmd.v info term
 
@@ -182,22 +180,20 @@ let plan_cmd =
           | `Json -> Emit.json result.Types.plan
           | `Shell -> Emit.shell result.Types.plan
         in
-        Printf.printf "%s\n" output;
-        `Ok 0
+        Printf.printf "%s\n" output
     | Error e ->
-        Printf.eprintf "gel: %s\n" (Types.error_to_string e);
-        `Ok 1
+        Printf.eprintf "jello: %s\n" (Types.error_to_string e);
+        exit 1
   in
   let term =
     Term.(
-      ret
-        (const plan_action $ format $ args
-        $ Fmt_cli.style_renderer ()
-        $ Logs_cli.level ()))
+      const plan_action $ format $ args
+      $ Fmt_cli.style_renderer ()
+      $ Logs_cli.level ())
   in
   Cmd.v info term
 
-(* --- Wrapper mode (gelcc / gelc++ / geld) --- *)
+(* --- Wrapper mode (jellocc / jelloc++ / jellod) --- *)
 
 let run_wrapper_mode () =
   let args = Array.to_list Sys.argv |> List.tl in
@@ -205,7 +201,7 @@ let run_wrapper_mode () =
   match Driver.link config args with
   | Ok result -> exit result.Types.exit_code
   | Error e ->
-      Printf.eprintf "gel: %s\n" (Types.error_to_string e);
+      Printf.eprintf "jello: %s\n" (Types.error_to_string e);
       exit 1
 
 (* --- Main --- *)
@@ -217,16 +213,16 @@ let () =
       let open Cmdliner in
       let doc = "An intelligent linker driver." in
       let info =
-        Cmd.info "gel" ~version:"0.1.0" ~doc
+        Cmd.info "jello" ~version:"0.1.0" ~doc
           ~man:
             [
               `S Manpage.s_description;
               `P
-                "gel is a linker driver that normalizes invocations, \
+                "jello is a linker driver that normalizes invocations, \
                  resolves dependencies, reorders libraries, selects \
                  backends, and produces actionable diagnostics.";
               `S Manpage.s_bugs;
-              `P "Report issues at https://github.com/deepsaint/jello";
+              `P "Report issues at https://github.com/saint0x/jello";
             ]
       in
       let cmd = Cmd.group info [ link_cmd; doctor_cmd; plan_cmd ] in

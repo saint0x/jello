@@ -8,6 +8,8 @@ let src = Logs.Src.create "jello.symbols" ~doc:"Symbol extraction"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
+let ( let* ) = Result.bind
+
 (* Parse a single nm -P output line.
    Format: name type [value [size]] *)
 let parse_line line =

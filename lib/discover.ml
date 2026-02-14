@@ -21,23 +21,19 @@ let which name =
   | _ -> None
 
 (* Detect which linker a path actually is by checking --version *)
-let identify_linker path =
+let _identify_linker path =
   match run_capture Bos.Cmd.(v path % "--version") with
   | Ok output ->
       let lower = String.lowercase_ascii output in
       if String.length lower > 0 then
-        if String.is_prefix ~affix:"mold" lower then Some Mold
-        else if String.is_prefix ~affix:"lld" lower
-                || String.is_prefix ~affix:"llvm" lower then Some Lld
-        else if String.is_prefix ~affix:"gnu gold" lower then Some Gold
-        else if String.is_prefix ~affix:"gnu ld" lower then Some Bfd
+        if String.starts_with ~prefix:"mold" lower then Some Mold
+        else if String.starts_with ~prefix:"lld" lower
+                || String.starts_with ~prefix:"llvm" lower then Some Lld
+        else if String.starts_with ~prefix:"gnu gold" lower then Some Gold
+        else if String.starts_with ~prefix:"gnu ld" lower then Some Bfd
         else Some System
       else Some System
   | Error _ -> None
-
-and is_prefix ~affix s =
-  String.length s >= String.length affix
-  && String.sub s 0 (String.length affix) = affix
 
 (* Try to find a backend binary *)
 let find_backend_path backend =

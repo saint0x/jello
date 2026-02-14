@@ -1,4 +1,4 @@
 (executable
  (name main)
- (public_name gel)
- (libraries jello cmdliner logs logs.fmt fmt fmt.tty))
+ (public_name jello)
+ (libraries jello cmdliner logs logs.fmt logs.cli fmt fmt.tty fmt.cli))

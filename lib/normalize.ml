@@ -47,7 +47,7 @@ let remove_redundant flags =
   go [] flags
 
 (* Ensure output has a default if not specified *)
-let default_output inv =
+let default_output (inv : invocation) =
   match inv.output with
   | Some _ -> inv
   | None ->
@@ -59,11 +59,11 @@ let default_output inv =
       { inv with output = Some default }
 
 (* Main entry point *)
-let invocation inv =
+let invocation (inv : invocation) =
   Log.debug (fun m -> m "Normalizing %d flags, %d inputs"
     (List.length inv.flags) (List.length inv.inputs));
   let flags = inv.flags |> resolve_conflicts |> remove_redundant in
   let search_paths = dedup_search_paths inv.search_paths in
-  let inv = { inv with flags; search_paths } in
+  let inv : invocation = { inv with flags; search_paths } in
   let inv = default_output inv in
   Ok inv

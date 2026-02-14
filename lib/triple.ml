@@ -6,6 +6,8 @@ let src = Logs.Src.create "jello.triple" ~doc:"Target triple"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
+let ( let* ) = Result.bind
+
 (* Parse a triple string like "x86_64-unknown-linux-gnu" *)
 let parse s =
   let parts = String.split_on_char '-' s in
@@ -21,17 +23,23 @@ let parse s =
       in
       let env = env_of_string e in
       Ok { arch; vendor = Some v; os; env }
-  | [ a; o; e ] ->
+  | [ a; b; c ] ->
       let* arch =
         arch_of_string a
         |> Option.to_result ~none:(Parse_error (Printf.sprintf "unknown arch: %s" a))
       in
-      let* os =
-        os_of_string o
-        |> Option.to_result ~none:(Parse_error (Printf.sprintf "unknown os: %s" o))
-      in
-      let env = env_of_string e in
-      Ok { arch; vendor = None; os; env }
+      (* Disambiguate: if b is a valid OS, treat as arch-os-env;
+         otherwise treat as arch-vendor-os *)
+      (match os_of_string b with
+      | Some os ->
+          let env = env_of_string c in
+          Ok { arch; vendor = None; os; env }
+      | None ->
+          let* os =
+            os_of_string c
+            |> Option.to_result ~none:(Parse_error (Printf.sprintf "unknown os: %s" c))
+          in
+          Ok { arch; vendor = Some b; os; env = None })
   | [ a; o ] ->
       let* arch =
         arch_of_string a

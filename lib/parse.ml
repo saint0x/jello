@@ -8,6 +8,8 @@ let src = Logs.Src.create "jello.parse" ~doc:"Argument parser"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
+let ( let* ) = Result.bind
+
 (* Expand response files (@file.rsp) into their contents *)
 let expand_response_file path =
   match Bos.OS.File.read (Fpath.v path) with
