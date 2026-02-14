@@ -64,3 +64,34 @@ make CC=jellocc
 - **Full passthrough for all modes:** Compilation (`-c`), shared library linking (`-dynamiclib -shared`), and executable linking all routed transparently to the real compiler driver. jello didn't interfere with any of them.
 - **macOS flag handling:** Flags like `-dynamiclib`, `-install_name`, `-compatibility_version`, `-current_version`, `-arch arm64` were passed through verbatim. These are compiler driver flags that a raw linker wouldn't understand — jello correctly deferred to the compiler driver rather than trying to interpret them.
 - **Multi-target build:** lz4's Makefile builds three separate targets (static lib, shared lib, CLI) in a single `make` invocation. jello handled all of them seamlessly.
+
+---
+
+## 3. libsodium
+
+**Repo:** https://github.com/jedisct1/libsodium
+**Result:** PASS
+**Date:** 2026-02-14
+
+### Why This Project
+
+libsodium is a widely-used crypto library with an autotools build system (`./configure && make`). It exercises jello against a more complex build pipeline: autoconf probes the compiler with dozens of feature-detection invocations during `./configure`, then `make` compiles into multiple internal convenience libraries before linking the final `libsodium` as both static and shared. This tests jello's ability to survive autoconf's compiler introspection (flag probing, feature tests, `-Werror` trials) and libtool's multi-stage link orchestration.
+
+### Build Command
+
+```
+CC=jellocc ./configure && make -j4
+```
+
+### Output Summary
+
+- 146 C source files compiled via passthrough
+- 9 link steps: 8 internal convenience libraries (`libsse41`, `libavx2`, `libavx512f`, `libaesni`, `libsse2`, `libarmcrypto`, `libssse3`, `librdrand`) + final `libsodium.la`
+- Both static (`libsodium.a`, 939 KB) and shared (`libsodium.30.dylib`, 741 KB) outputs produced
+- Zero errors, zero warnings (ranlib warnings about empty archives are expected on macOS for x86-only SIMD libs)
+
+### What Jello Provided
+
+- **Autoconf compatibility:** `./configure` runs dozens of compiler probes — feature tests, flag checks, `conftest.c` compilations, `-Werror` trials. All of them passed through jello transparently. The configure script had no idea it wasn't talking to the real compiler.
+- **Libtool orchestration:** libtool wraps `CC` with its own flags (`-fPIC`, `-DPIC`, version info, install names) and calls it for both compilation and linking. jello handled all of libtool's invocation patterns without interference.
+- **Multi-library builds:** 8 internal convenience libraries for different CPU instruction sets (SSE2, SSE4.1, AVX2, AVX-512, AES-NI, ARM Crypto, SSSE3, RDRAND) all compiled and linked independently before being merged into the final `libsodium`. jello handled the full DAG.
