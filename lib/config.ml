@@ -123,13 +123,6 @@ let log_level_of_string = function
   | "debug" -> Some Log_debug
   | _ -> None
 
-let log_level_to_string = function
-  | Log_quiet -> "quiet"
-  | Log_error -> "error"
-  | Log_warning -> "warning"
-  | Log_info -> "info"
-  | Log_debug -> "debug"
-
 let to_logs_level = function
   | Log_quiet -> None
   | Log_error -> Some Logs.Error
@@ -323,5 +316,3 @@ let load () =
   in
   let merged = merge env_cfg (merge project_cfg user_cfg) in
   Ok (resolve merged)
-
-let _ = log_level_to_string

@@ -238,7 +238,6 @@ type link_plan = {
   fixes_applied : fix list;
   diagnostics : diagnostic list;
   raw_args : string list;
-  normalized_args : string list;
   backend_args : string list;
 }
 

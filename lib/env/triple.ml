@@ -90,14 +90,20 @@ let detect_from_host () =
   let arch =
     match arch_of_string (String.lowercase_ascii machine) with
     | Some a -> a
-    | None -> X86_64
+    | None ->
+        Log.warn (fun m ->
+            m "Unknown architecture '%s' from uname, defaulting to x86_64" machine);
+        X86_64
   in
   let os =
     match String.lowercase_ascii sysname with
     | "linux" -> Linux
     | "darwin" -> Darwin
     | "freebsd" -> FreeBSD
-    | _ -> Linux
+    | other ->
+        Log.warn (fun m ->
+            m "Unknown OS '%s' from uname, defaulting to linux" other);
+        Linux
   in
   let env =
     match os with

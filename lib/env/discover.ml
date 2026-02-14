@@ -20,21 +20,6 @@ let which name =
   | Ok (Some p) -> Some (Fpath.to_string p)
   | _ -> None
 
-(* Detect which linker a path actually is by checking --version *)
-let _identify_linker path =
-  match run_capture Bos.Cmd.(v path % "--version") with
-  | Ok output ->
-      let lower = String.lowercase_ascii output in
-      if String.length lower > 0 then
-        if String.starts_with ~prefix:"mold" lower then Some Mold
-        else if String.starts_with ~prefix:"lld" lower
-                || String.starts_with ~prefix:"llvm" lower then Some Lld
-        else if String.starts_with ~prefix:"gnu gold" lower then Some Gold
-        else if String.starts_with ~prefix:"gnu ld" lower then Some Bfd
-        else Some System
-      else Some System
-  | Error _ -> None
-
 (* Try to find a backend binary *)
 let find_backend_path backend =
   let names =

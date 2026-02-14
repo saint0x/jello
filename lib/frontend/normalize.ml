@@ -51,11 +51,7 @@ let default_output (inv : invocation) =
   match inv.output with
   | Some _ -> inv
   | None ->
-      let default =
-        match inv.link_mode with
-        | Shared -> "a.out"
-        | _ -> "a.out"
-      in
+      let default = "a.out" in
       { inv with output = Some default }
 
 (* Main entry point *)

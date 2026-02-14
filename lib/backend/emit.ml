@@ -12,7 +12,6 @@ let ( let* ) = Result.bind
 (* --- JSON encoding --- *)
 
 let string_j s = `String s
-let _int_j i = `Int i
 let list_j f xs = `List (List.map f xs)
 let option_j f = function Some v -> f v | None -> `Null
 
@@ -175,10 +174,13 @@ let write_artifacts ~dir plan diags =
       (diagnostics_json diags)
   in
   (* Make shell script executable *)
-  let _ =
+  (match
     OS.Cmd.run
       Cmd.(v "chmod" % "+x" % Fpath.to_string Fpath.(dir / "linkplan.sh"))
-  in
+  with
+  | Ok () -> ()
+  | Error (`Msg msg) ->
+      Log.warn (fun m -> m "Could not make linkplan.sh executable: %s" msg));
   Log.info (fun m ->
       m "Wrote plan artifacts to %s" (Fpath.to_string dir));
   Ok ()

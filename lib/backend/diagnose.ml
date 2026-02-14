@@ -125,9 +125,10 @@ let cannot_find_lib_rule =
               };
               {
                 description =
-                  "Add the directory containing the library with -L";
+                  Printf.sprintf
+                    "Add the directory containing lib%s with -L<dir>" lib;
                 confidence = Medium;
-                action = Add_search_path "";
+                action = Add_search_path (Printf.sprintf "<lib%s-dir>" lib);
               };
             ];
         });
@@ -337,7 +338,7 @@ let version_node_rule =
                 description =
                   "Rebuild against the correct library version";
                 confidence = Medium;
-                action = Suggest_recompile { file = ""; flags = [] };
+                action = Suggest_recompile { file = "<affected>"; flags = [] };
               };
             ];
         });
@@ -364,7 +365,7 @@ let hidden_symbol_rule =
                   "Mark symbol with \
                    __attribute__((visibility(\"default\")))";
                 confidence = High;
-                action = Suggest_recompile { file = ""; flags = [] };
+                action = Suggest_recompile { file = "<affected>"; flags = [] };
               };
             ];
         });
@@ -411,7 +412,7 @@ let tls_mismatch_rule =
                 description =
                   "Ensure consistent __thread / _Thread_local usage";
                 confidence = High;
-                action = Suggest_recompile { file = ""; flags = [] };
+                action = Suggest_recompile { file = "<affected>"; flags = [] };
               };
             ];
         });
@@ -435,7 +436,7 @@ let text_reloc_rule =
                 description = "Recompile all objects with -fPIC";
                 confidence = High;
                 action =
-                  Suggest_recompile { file = ""; flags = [ "-fPIC" ] };
+                  Suggest_recompile { file = "<affected>"; flags = [ "-fPIC" ] };
               };
             ];
         });
@@ -458,7 +459,7 @@ let lto_mismatch_rule =
                 description =
                   "Use consistent compiler versions for compile and link";
                 confidence = High;
-                action = Suggest_recompile { file = ""; flags = [] };
+                action = Suggest_recompile { file = "<affected>"; flags = [] };
               };
               {
                 description = "Pass -fuse-linker-plugin at link time";
@@ -504,7 +505,7 @@ let region_overflow_rule =
                 description =
                   "Optimize for size (-Os) or increase memory region";
                 confidence = Low;
-                action = Suggest_recompile { file = ""; flags = [ "-Os" ] };
+                action = Suggest_recompile { file = "<affected>"; flags = [ "-Os" ] };
               };
             ];
         });
@@ -529,7 +530,7 @@ let got_overflow_rule =
                 action =
                   Suggest_recompile
                     {
-                      file = "";
+                      file = "<affected>";
                       flags = [ "-mcmodel=medium"; "-fvisibility=hidden" ];
                     };
               };

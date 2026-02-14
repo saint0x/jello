@@ -123,7 +123,6 @@ let build ~(inv : invocation) ~triple ~backend ~backend_path ~resolved_libs
       fixes_applied = fixes;
       diagnostics;
       raw_args = inv.raw_args;
-      normalized_args = [];
       backend_args = [];
     }
   in
