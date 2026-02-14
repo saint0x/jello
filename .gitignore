@@ -5,3 +5,5 @@ _opam/
 .jello/
 CLAUDE.md
 JELLO.md
+test-compilation-candidates.md
+testprojects/

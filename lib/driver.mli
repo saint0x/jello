@@ -15,3 +15,8 @@ type config = {
 
 val default_config : config
 val link : config -> string list -> (Types.exec_result, Types.error) result
+
+(** Compile passthrough: finds the real compiler (skipping [$CC]/[$CXX] to
+    avoid self-reference) and executes it with all args verbatim.
+    Used when wrapper mode detects a compile-only invocation ([-c]/[-S]/[-E]). *)
+val compile : [ `C | `Cxx ] -> config -> string list -> int

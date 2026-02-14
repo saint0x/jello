@@ -107,6 +107,35 @@ let collect_archive_paths (inv : invocation) resolved_libs =
   in
   from_inputs @ from_resolved
 
+(* Compile passthrough: find the real compiler, exec with all args verbatim.
+   Returns the process exit code directly — no plan, no diagnostics. *)
+let compile lang config args =
+  let compiler_result = Discover.real_compiler lang in
+  match compiler_result with
+  | Error e ->
+      if not config.silent then
+        Printf.eprintf "jello: %s\n" (error_to_string e);
+      1
+  | Ok compiler_path ->
+      Log.info (fun m ->
+          m "Compile passthrough: %s %s" compiler_path
+            (String.concat " " args));
+      let cmd =
+        List.fold_left
+          (fun c a -> Bos.Cmd.(c % a))
+          (Bos.Cmd.v compiler_path)
+          args
+      in
+      (match Execute.run_cmd cmd with
+      | Ok (code, _stdout, stderr) ->
+          if stderr <> "" && not config.silent then
+            Printf.eprintf "%s" stderr;
+          code
+      | Error (`Msg msg) ->
+          if not config.silent then
+            Printf.eprintf "jello: compile passthrough failed: %s\n" msg;
+          1)
+
 (* The full pipeline *)
 let link config args =
   Log.info (fun m -> m "Starting jello link pipeline");

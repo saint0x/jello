@@ -256,6 +256,11 @@ let rec parse_args acc_flags acc_inputs args =
       Log.debug (fun m -> m "Passing through unknown flag: %s" arg);
       parse_args (Passthrough arg :: acc_flags) acc_inputs rest
 
+(* Lightweight pre-scan: detect compile-only invocations.
+   These have -c, -S, or -E and should passthrough to the real compiler. *)
+let is_compile_only args =
+  List.exists (fun a -> a = "-c" || a = "-S" || a = "-E") args
+
 (* Determine link mode from flags *)
 let determine_link_mode flags =
   let has f = List.exists (fun x -> x = f) flags in

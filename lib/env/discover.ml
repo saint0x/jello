@@ -117,6 +117,38 @@ let compiler lang =
                (Printf.sprintf "no %s compiler found"
                   (match lang with `C -> "C" | `Cxx -> "C++"))))
 
+(* Jello wrapper names — used to detect self-references *)
+let jello_names = [ "jello"; "jellocc"; "jelloc++"; "jellold" ]
+
+(* Check if a path resolves to a jello binary *)
+let is_jello_binary path =
+  let basename = Filename.basename path in
+  List.mem basename jello_names
+
+(* Find the real compiler, skipping $CC/$CXX env vars and any paths that
+   resolve to jello. This prevents infinite loops when CC=jellocc. *)
+let real_compiler lang =
+  let defaults =
+    match lang with
+    | `C -> [ "cc"; "gcc"; "clang" ]
+    | `Cxx -> [ "c++"; "g++"; "clang++" ]
+  in
+  let found =
+    List.find_map
+      (fun name ->
+        match which name with
+        | Some p when not (is_jello_binary p) -> Some p
+        | _ -> None)
+      defaults
+  in
+  match found with
+  | Some p -> Ok p
+  | None ->
+      Error
+        (Discovery_error
+           (Printf.sprintf "no real %s compiler found (all candidates resolve to jello)"
+              (match lang with `C -> "C" | `Cxx -> "C++")))
+
 (* Get default library search paths from the system linker *)
 let search_paths () =
   (* Try ld --verbose to get SEARCH_DIR directives *)

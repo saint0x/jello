@@ -59,3 +59,13 @@ let run plan =
 let dry_run plan =
   let cmd = build_cmd plan in
   Bos.Cmd.to_string cmd
+
+(* Run an arbitrary command, capturing exit code + combined output.
+   Used for compile passthrough where we don't have a link_plan. *)
+let run_cmd cmd =
+  Log.info (fun m -> m "Executing: %s" (Bos.Cmd.to_string cmd));
+  let open Bos in
+  match OS.Cmd.(run_out ~err:err_run_out cmd |> out_string) with
+  | Ok (combined, (_, `Exited code)) -> Ok (code, "", combined)
+  | Ok (combined, (_, `Signaled sig_num)) -> Ok (128 + sig_num, "", combined)
+  | Error (`Msg msg) -> Error (`Msg msg)
