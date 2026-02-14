@@ -126,3 +126,35 @@ make CC=jellocc HAVE_ZLIB=0 HAVE_LZMA=0 HAVE_LZ4=0 -j4
 - **Multi-configuration builds:** The same source files were compiled three times with different flags (`-fPIC` for shared, without for static, with program-specific defines for CLI). jello passed through all three configurations without interference.
 - **Complex link invocation:** The final `zstd` binary link command included 41 object files, `-pthread`, `-arch arm64`, and dozens of warning flags — all passed through verbatim to the real compiler driver.
 - **Build system flag soup:** zstd's Makefile passes aggressive warning flags (`-Wcast-qual`, `-Wstrict-aliasing=1`, `-Wc++-compat`), architecture flags, and GNU-style assembler options (`-Wa,--noexecstack`). jello handled all of them transparently.
+
+---
+
+## 5. mimalloc
+
+**Repo:** https://github.com/microsoft/mimalloc
+**Result:** PASS
+**Date:** 2026-02-14
+
+### Why This Project
+
+mimalloc is Microsoft's production memory allocator — a small, clean C project with a CMake build system. It tests jello against CMake's compiler detection and probing pipeline, which is more sophisticated than autotools: CMake runs ABI detection, feature probes, and `try_compile` tests before any real compilation begins. mimalloc also links against `pthread` and builds platform-specific code (macOS zone overrides, interposition), testing jello's ability to handle platform-aware linking through CMake.
+
+### Build Command
+
+```
+cmake -S . -B build -DCMAKE_C_COMPILER=jellocc && cmake --build build -j4
+```
+
+### Output Summary
+
+- 39 C source files compiled via passthrough across 4 build targets (shared, static, object, tests)
+- 6 link targets: `libmimalloc.a` (static), `libmimalloc.dylib` (shared), `mimalloc-test-api`, `mimalloc-test-api-fill`, `mimalloc-test-stress`, `mimalloc-test-stress-dynamic`
+- CMake correctly identified jellocc as AppleClang 17.0.0
+- All test binaries built and linked against `pthread`
+- Zero errors, zero warnings
+
+### What Jello Provided
+
+- **CMake compiler detection:** CMake ran ABI detection, feature probing, and `try_compile` checks through jellocc. All probes passed — CMake correctly identified the compiler as AppleClang and detected all platform capabilities (`libpthread`, TLS model support, visibility attributes).
+- **Platform-specific compilation:** mimalloc builds macOS-specific allocation zone overrides (`alloc-override-zone.c`) and interposition code. These require platform-specific compiler flags (`-ftls-model=initial-exec`, `-fno-builtin-malloc`) that jello passed through verbatim.
+- **Test binary linking:** 4 test executables linked against the shared and static libraries plus `pthread`. All link invocations succeeded through jello's passthrough to the real compiler driver.
