@@ -1,0 +1,4 @@
+(library
+ (name jello)
+ (public_name jello)
+ (libraries bos fpath yojson re logs fmt unix))

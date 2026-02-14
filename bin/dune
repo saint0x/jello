@@ -1,0 +1,4 @@
+(executable
+ (name main)
+ (public_name gel)
+ (libraries jello cmdliner logs logs.fmt fmt fmt.tty))
