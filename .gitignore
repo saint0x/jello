@@ -3,3 +3,5 @@ _opam/
 *.install
 .merlin
 .jello/
+CLAUDE.md
+JELLO.md
