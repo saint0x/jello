@@ -85,6 +85,34 @@ jello turns linking into a **modeled system** instead of a side-effect of toolch
 
 ---
 
+## Configuration
+
+jello works out of the box with zero config. For per-project customization, drop a `.jello.json` at your project root:
+
+```bash
+jello init
+```
+
+```json
+{
+  "fix_mode": "auto",
+  "emit_plan": true,
+  "plan_dir": ".jello",
+  "silent": true
+}
+```
+
+Config hierarchy (highest priority wins):
+
+1. Environment variables (`JELLO_BACKEND`, `JELLO_FIX_MODE`, etc.)
+2. Project config (`.jello.json`, found by walking up from CWD)
+3. User config (`~/.config/jello/config.json`)
+4. Defaults
+
+All fields are optional. Missing fields fall through to the next layer. Run `jello doctor` to see active config and detected environment.
+
+---
+
 ## What jello is not
 
 * Not a new ELF/Mach-O/COFF linker
