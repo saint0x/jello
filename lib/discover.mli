@@ -1,9 +1,15 @@
 (** Backend and toolchain discovery. *)
 
 val backend :
-  ?preferred:string -> unit -> (Types.backend * string, Types.error) result
+  ?override:Types.backend ->
+  ?preferred:string ->
+  ?preference:Types.backend list ->
+  unit ->
+  (Types.backend * string, Types.error) result
 
-val nm : unit -> (string, Types.error) result
+val find_backend_path : Types.backend -> string option
+
+val nm : ?override:string -> unit -> (string, Types.error) result
 val compiler : [ `C | `Cxx ] -> (string, Types.error) result
 val search_paths : unit -> string list
 val sysroot : string -> string option

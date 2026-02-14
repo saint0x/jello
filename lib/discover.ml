@@ -47,24 +47,29 @@ let find_backend_path backend =
   in
   List.find_map which names
 
-(* Backend preference order *)
-let preference = [ Mold; Lld; Gold; Bfd; System ]
+(* Default backend preference order *)
+let default_preference = [ Mold; Lld; Gold; Bfd; System ]
 
-(* Select the best available backend *)
-let backend ?preferred () =
-  (* If user specified -fuse-ld=X, honor it *)
-  let explicit =
-    match preferred with
-    | Some "mold" -> Some Mold
-    | Some "lld" -> Some Lld
-    | Some "gold" -> Some Gold
-    | Some "bfd" -> Some Bfd
-    | Some p ->
-        (* Treat as a path *)
-        if Sys.file_exists p then Some System else None
-    | None -> None
+(* Select the best available backend.
+   ~override: force a specific backend (from config)
+   ~preferred: -fuse-ld=X flag value (from CLI args)
+   ~preference: ordered list to try (from config, defaults to discovery) *)
+let backend ?override ?preferred ?preference () =
+  (* Config override takes precedence over -fuse-ld *)
+  let forced =
+    match override with
+    | Some b -> Some b
+    | None -> (
+        match preferred with
+        | Some "mold" -> Some Mold
+        | Some "lld" -> Some Lld
+        | Some "gold" -> Some Gold
+        | Some "bfd" -> Some Bfd
+        | Some p ->
+            if Sys.file_exists p then Some System else None
+        | None -> None)
   in
-  match explicit with
+  match forced with
   | Some b -> (
       match find_backend_path b with
       | Some path ->
@@ -77,14 +82,17 @@ let backend ?preferred () =
                (Printf.sprintf "requested backend %s not found"
                   (backend_to_string b))))
   | None ->
-      (* Auto-select best available *)
+      (* Auto-select: use preference list if provided, otherwise discover *)
+      let order =
+        match preference with Some p -> p | None -> default_preference
+      in
       let found =
         List.find_map
           (fun b ->
             match find_backend_path b with
             | Some path -> Some (b, path)
             | None -> None)
-          preference
+          order
       in
       (match found with
       | Some (b, path) ->
@@ -93,14 +101,17 @@ let backend ?preferred () =
           Ok (b, path)
       | None -> Error (Discovery_error "no linker backend found"))
 
-(* Find nm binary *)
-let nm () =
-  match which "llvm-nm" with
-  | Some p -> Ok p
-  | None -> (
-      match which "nm" with
+(* Find nm binary. ~override: force a specific path from config. *)
+let nm ?override () =
+  match override with
+  | Some path when Sys.file_exists path -> Ok path
+  | _ -> (
+      match which "llvm-nm" with
       | Some p -> Ok p
-      | None -> Error (Discovery_error "nm not found"))
+      | None -> (
+          match which "nm" with
+          | Some p -> Ok p
+          | None -> Error (Discovery_error "nm not found")))
 
 (* Find the compiler for a given language *)
 let compiler lang =

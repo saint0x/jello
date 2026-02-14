@@ -66,6 +66,7 @@ val link_mode_to_string : link_mode -> string
 type backend = Mold | Lld | Gold | Bfd | System
 
 val backend_to_string : backend -> string
+val backend_of_string : string -> backend option
 
 (** {1 Library References} *)
 
@@ -203,6 +204,9 @@ type diagnostic = {
 (** {1 Fix Mode} *)
 
 type fix_mode = Auto_fix | Suggest | Hard_fail
+
+val fix_mode_of_string : string -> fix_mode option
+val fix_mode_to_string : fix_mode -> string
 
 (** {1 Invocation} *)
 

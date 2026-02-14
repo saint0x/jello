@@ -179,6 +179,14 @@ let backend_to_string = function
   | Bfd -> "bfd"
   | System -> "system"
 
+let backend_of_string = function
+  | "mold" -> Some Mold
+  | "lld" -> Some Lld
+  | "gold" -> Some Gold
+  | "bfd" -> Some Bfd
+  | "system" -> Some System
+  | _ -> None
+
 (* --- Library reference (unresolved) --- *)
 
 type lib_ref =
@@ -350,6 +358,17 @@ type fix_mode =
   | Auto_fix
   | Suggest
   | Hard_fail
+
+let fix_mode_of_string = function
+  | "auto" -> Some Auto_fix
+  | "suggest" -> Some Suggest
+  | "strict" -> Some Hard_fail
+  | _ -> None
+
+let fix_mode_to_string = function
+  | Auto_fix -> "auto"
+  | Suggest -> "suggest"
+  | Hard_fail -> "strict"
 
 (* --- Invocation (pre-plan) --- *)
 

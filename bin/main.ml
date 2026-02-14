@@ -17,6 +17,29 @@ let detect_mode () =
   | "jellod" -> `Ld
   | _ -> `Direct
 
+(* Convert Config.t to Driver.config *)
+let config_to_driver cfg =
+  {
+    Driver.fix_mode = cfg.Config.fix_mode;
+    emit_plan = cfg.Config.emit_plan;
+    plan_dir = cfg.Config.plan_dir;
+    dry_run = cfg.Config.dry_run;
+    explain = cfg.Config.explain;
+    backend_override = cfg.Config.backend;
+    backend_preference = cfg.Config.backend_preference;
+    extra_search_paths = cfg.Config.search_paths;
+    nm_override = cfg.Config.nm;
+    silent = cfg.Config.silent;
+  }
+
+(* Load config, silently fall back to defaults on error *)
+let load_config () =
+  match Config.load () with
+  | Ok cfg -> cfg
+  | Error msg ->
+      Printf.eprintf "jello: config warning: %s\n" msg;
+      Config.defaults
+
 (* --- Link subcommand --- *)
 
 let link_cmd =
@@ -35,41 +58,71 @@ let link_cmd =
   let plan_dir =
     Arg.(
       value
-      & opt string ".jello"
+      & opt (some string) None
       & info [ "plan-dir" ] ~docv:"DIR"
           ~doc:"Directory for plan artifacts.")
   in
   let mode =
     Arg.(
       value
-      & opt
-          (enum
+      & opt (some (enum
              [
                ("auto", Types.Auto_fix);
                ("suggest", Types.Suggest);
                ("strict", Types.Hard_fail);
-             ])
-          Types.Auto_fix
+             ])) None
       & info [ "mode" ] ~docv:"MODE"
           ~doc:
             "Fix mode: auto (apply safe fixes), suggest (explain only), \
              strict (fail on issues).")
   in
+  let backend_flag =
+    Arg.(
+      value
+      & opt (some string) None
+      & info [ "backend" ] ~docv:"BACKEND"
+          ~doc:"Force linker backend: mold, lld, gold, bfd, system.")
+  in
   let args =
     Arg.(value & pos_all string [] & info [] ~docv:"ARGS" ~doc:"Linker arguments.")
   in
-  let link_action dry_run explain no_plan plan_dir mode args _style_renderer _level =
+  let link_action dry_run explain no_plan plan_dir mode backend_flag args
+      _style_renderer _level =
     setup_logging _style_renderer _level;
-    let config =
+    let cfg = load_config () in
+    let driver_cfg = config_to_driver cfg in
+    (* CLI flags override config *)
+    let driver_cfg =
       {
-        Driver.fix_mode = mode;
-        emit_plan = not no_plan;
-        plan_dir;
-        dry_run;
-        explain;
+        driver_cfg with
+        dry_run = dry_run || driver_cfg.dry_run;
+        explain = explain || driver_cfg.explain;
+        emit_plan = (if no_plan then false else driver_cfg.emit_plan);
+        silent = false;
       }
     in
-    match Driver.link config args with
+    let driver_cfg =
+      match plan_dir with
+      | Some d -> { driver_cfg with plan_dir = d }
+      | None -> driver_cfg
+    in
+    let driver_cfg =
+      match mode with
+      | Some m -> { driver_cfg with fix_mode = m }
+      | None -> driver_cfg
+    in
+    let driver_cfg =
+      match backend_flag with
+      | Some b -> (
+          match Types.backend_of_string b with
+          | Some backend ->
+              { driver_cfg with backend_override = Some backend }
+          | None ->
+              Printf.eprintf "jello: unknown backend: %s\n" b;
+              driver_cfg)
+      | None -> driver_cfg
+    in
+    match Driver.link driver_cfg args with
     | Ok result ->
         if result.Types.exit_code <> 0 then
           exit result.Types.exit_code
@@ -80,7 +133,7 @@ let link_cmd =
   let term =
     Term.(
       const link_action
-      $ dry_run $ explain $ no_plan $ plan_dir $ mode $ args
+      $ dry_run $ explain $ no_plan $ plan_dir $ mode $ backend_flag $ args
       $ Fmt_cli.style_renderer ()
       $ Logs_cli.level ())
   in
@@ -96,6 +149,16 @@ let doctor_cmd =
     setup_logging _style_renderer _level;
     Printf.printf "jello doctor\n";
     Printf.printf "============\n\n";
+    (* Config *)
+    let cfg = load_config () in
+    (match Config.find_project_config (Sys.getcwd ()) with
+    | Some path -> Printf.printf "Config:       %s\n" path
+    | None -> Printf.printf "Config:       none (using defaults)\n");
+    Printf.printf "Fix mode:     %s\n" (Types.fix_mode_to_string cfg.fix_mode);
+    Printf.printf "Emit plan:    %b\n" cfg.emit_plan;
+    Printf.printf "Plan dir:     %s\n" cfg.plan_dir;
+    Printf.printf "Silent:       %b\n" cfg.silent;
+    Printf.printf "\n";
     (* Compiler *)
     (match Discover.compiler `C with
     | Ok cc -> Printf.printf "C compiler:   %s\n" cc
@@ -142,7 +205,12 @@ let doctor_cmd =
     Printf.printf "\nDefault search paths:\n";
     List.iter
       (fun p -> Printf.printf "  %s\n" p)
-      (Discover.search_paths ())
+      (Discover.search_paths ());
+    if cfg.search_paths <> [] then (
+      Printf.printf "\nExtra search paths (from config):\n";
+      List.iter
+        (fun p -> Printf.printf "  %s\n" p)
+        cfg.search_paths)
   in
   let term =
     Term.(
@@ -170,10 +238,11 @@ let plan_cmd =
   in
   let plan_action format args _style_renderer _level =
     setup_logging _style_renderer _level;
-    let config =
-      { Driver.default_config with dry_run = true; emit_plan = false }
+    let cfg = load_config () in
+    let driver_cfg =
+      { (config_to_driver cfg) with dry_run = true; emit_plan = false; silent = false }
     in
-    match Driver.link config args with
+    match Driver.link driver_cfg args with
     | Ok result ->
         let output =
           match format with
@@ -193,15 +262,55 @@ let plan_cmd =
   in
   Cmd.v info term
 
+(* --- Init subcommand --- *)
+
+let init_cmd =
+  let open Cmdliner in
+  let doc = "Create a .jello.json config file in the current directory." in
+  let info = Cmd.info "init" ~doc in
+  let init_action _style_renderer _level =
+    setup_logging _style_renderer _level;
+    let path = ".jello.json" in
+    if Sys.file_exists path then (
+      Printf.eprintf "jello: %s already exists\n" path;
+      exit 1)
+    else
+      let contents =
+        {|{
+  "fix_mode": "auto",
+  "emit_plan": true,
+  "plan_dir": ".jello",
+  "silent": true
+}
+|}
+      in
+      let oc = open_out path in
+      output_string oc contents;
+      close_out oc;
+      Printf.printf "Created %s\n" path
+  in
+  let term =
+    Term.(
+      const init_action
+      $ Fmt_cli.style_renderer ()
+      $ Logs_cli.level ())
+  in
+  Cmd.v info term
+
 (* --- Wrapper mode (jellocc / jelloc++ / jellod) --- *)
 
 let run_wrapper_mode () =
   let args = Array.to_list Sys.argv |> List.tl in
-  let config = Driver.default_config in
-  match Driver.link config args with
+  let cfg = load_config () in
+  let driver_cfg = config_to_driver cfg in
+  (* Set up logging based on config *)
+  if not cfg.silent then
+    setup_logging None (Config.to_logs_level cfg.log_level);
+  match Driver.link driver_cfg args with
   | Ok result -> exit result.Types.exit_code
   | Error e ->
-      Printf.eprintf "jello: %s\n" (Types.error_to_string e);
+      if not cfg.silent then
+        Printf.eprintf "jello: %s\n" (Types.error_to_string e);
       exit 1
 
 (* --- Main --- *)
@@ -225,5 +334,7 @@ let () =
               `P "Report issues at https://github.com/saint0x/jello";
             ]
       in
-      let cmd = Cmd.group info [ link_cmd; doctor_cmd; plan_cmd ] in
+      let cmd =
+        Cmd.group info [ link_cmd; doctor_cmd; plan_cmd; init_cmd ]
+      in
       exit (Cmd.eval cmd)

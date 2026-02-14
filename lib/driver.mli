@@ -6,6 +6,11 @@ type config = {
   plan_dir : string;
   dry_run : bool;
   explain : bool;
+  backend_override : Types.backend option;
+  backend_preference : Types.backend list option;
+  extra_search_paths : string list;
+  nm_override : string option;
+  silent : bool;
 }
 
 val default_config : config

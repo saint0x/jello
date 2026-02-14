@@ -15,6 +15,11 @@ type config = {
   plan_dir : string;
   dry_run : bool;
   explain : bool;
+  backend_override : backend option;
+  backend_preference : backend list option;
+  extra_search_paths : string list;
+  nm_override : string option;
+  silent : bool;
 }
 
 let default_config =
@@ -24,28 +29,35 @@ let default_config =
     plan_dir = ".jello";
     dry_run = false;
     explain = false;
+    backend_override = None;
+    backend_preference = None;
+    extra_search_paths = [];
+    nm_override = None;
+    silent = true;
   }
 
 (* Pretty-print a diagnostic to stderr *)
-let print_diagnostic d =
-  let prefix =
-    match d.severity with
-    | Sev_error -> "error"
-    | Sev_warning -> "warning"
-    | Sev_info -> "info"
-    | Sev_hint -> "hint"
-  in
-  Printf.eprintf "[jello:%s] %s: %s\n" d.code prefix d.message;
-  List.iter
-    (fun f ->
-      let conf =
-        match f.confidence with
-        | High -> "fix"
-        | Medium -> "suggestion"
-        | Low -> "hint"
-      in
-      Printf.eprintf "  %s: %s\n" conf f.description)
-    d.fixes
+let print_diagnostic ~silent d =
+  if silent then ()
+  else
+    let prefix =
+      match d.severity with
+      | Sev_error -> "error"
+      | Sev_warning -> "warning"
+      | Sev_info -> "info"
+      | Sev_hint -> "hint"
+    in
+    Printf.eprintf "[jello:%s] %s: %s\n" d.code prefix d.message;
+    List.iter
+      (fun f ->
+        let conf =
+          match f.confidence with
+          | High -> "fix"
+          | Medium -> "suggestion"
+          | Low -> "hint"
+        in
+        Printf.eprintf "  %s: %s\n" conf f.description)
+      d.fixes
 
 (* Print the explain trace *)
 let print_explain plan =
@@ -113,8 +125,16 @@ let link config args =
   Log.info (fun m -> m "Target: %s" (triple_to_string triple));
   (* Phase 4: Discover backend *)
   let preferred = Plan.preferred_linker inv.flags in
-  let* backend, backend_path = Discover.backend ?preferred () in
-  (* Phase 5: Resolve libraries *)
+  let* backend, backend_path =
+    Discover.backend ?override:config.backend_override ?preferred
+      ?preference:config.backend_preference ()
+  in
+  (* Phase 5: Resolve libraries — prepend extra search paths from config *)
+  let inv =
+    if config.extra_search_paths <> [] then
+      { inv with search_paths = config.extra_search_paths @ inv.search_paths }
+    else inv
+  in
   let resolved_libs, search_paths =
     match Resolve.libs inv with
     | Ok (libs, paths) -> (libs, paths)
@@ -167,5 +187,5 @@ let link config args =
       if result.exit_code <> 0 then Diagnose.errors result else result
     in
     (* Print diagnostics *)
-    List.iter print_diagnostic result.post_diagnostics;
+    List.iter (print_diagnostic ~silent:config.silent) result.post_diagnostics;
     Ok result
